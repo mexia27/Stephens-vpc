@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Creating a VPC Infrastructure"
+# Metadata: 
+
+# Parameters: 
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  myvpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.100.0.0/16
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: mans-vpc
+
+  PubnetSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: myvpc
+    Properties:
+      AvailabilityZone: us-east-1a
+      VpcId: !Ref myvpc
+      CidrBlock: 10.100.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Pubsub-1
+
+  PrivnetSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: myvpc
+    Properties:
+      AvailabilityZone: us-east-1a
+      VpcId: !Ref myvpc
+      CidrBlock: 10.100.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Privsub-1
+
+  PubnetSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: myvpc
+    Properties:
+      AvailabilityZone: us-east-1b
+      VpcId: !Ref myvpc
+      CidrBlock: 10.100.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Pubsub-2
+
+  PrivnetSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: myvpc  
+    Properties:
+      AvailabilityZone: us-east-1b
+      VpcId: !Ref myvpc
+      CidrBlock: 10.100.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Privsub-2                          
+
+  igwName:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: myvpc
+    Properties:
+      Tags:
+        - Key: Name
+          Value: mans-igw
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref myvpc
+      InternetGatewayId: !Ref igwName
+
+
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Network
+          Value: Public-rt
+
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref myvpc
+      Tags:
+        - Key: Network
+          Value: Priv-rt            
+
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref igwName
+     
+  PublicSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubnetSub1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubnetSub2
+      RouteTableId: !Ref PublicRouteTable    
+
+
+  NATGateway:
+   Type: AWS::EC2::NatGateway
+   Properties:
+      AllocationId: !GetAtt NATGatewayEIP.AllocationId
+      SubnetId: !Ref PubnetSub1
+      Tags:
+      - Key: stack
+        Value: production
+  NATGatewayEIP:
+   Type: AWS::EC2::EIP
+   Properties:
+      Domain: vpc
+  RouteNATGateway:
+   DependsOn: NATGateway
+   Type: AWS::EC2::Route
+   Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NATGateway
+
+  PrivSubnetRouteTableAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivnetSub1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivSubnetRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivnetSub2
+      RouteTableId: !Ref PrivateRouteTable
+
+
+# Outputs:
